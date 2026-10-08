@@ -1,0 +1,19 @@
+{
+  "name": "DUEX LAPINS MANAGER",
+  "short_name": "DL MANAGER",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F3F0E9",
+  "theme_color": "#F3F0E9",
+  "description": "DUEX LAPINS manager console",
+  "orientation": "landscape-primary",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "duex_lapins_icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
