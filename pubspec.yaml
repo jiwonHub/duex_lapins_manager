@@ -1,5 +1,5 @@
-name: duex_lapins_manager
-description: DUEX LAPINS web manager console.
+name: deux_lapins_manager
+description: DEUX LAPINS web manager console.
 publish_to: "none"
 version: 1.0.0+1
 
@@ -22,4 +22,4 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/duex_lapins_logo.png
+    - assets/images/deux_lapins_logo.png

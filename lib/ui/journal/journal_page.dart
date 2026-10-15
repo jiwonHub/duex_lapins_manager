@@ -1,11 +1,11 @@
-import 'package:duex_lapins_manager/app/app_routes.dart';
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/utils/formatters.dart';
-import 'package:duex_lapins_manager/core/widgets/page_heading.dart';
-import 'package:duex_lapins_manager/ui/shared/admin_status_badges.dart';
-import 'package:duex_lapins_manager/domain/models/admin_home_content.dart';
-import 'package:duex_lapins_manager/ui/journal/journal_view_model.dart';
+import 'package:deux_lapins_manager/app/app_routes.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/utils/formatters.dart';
+import 'package:deux_lapins_manager/core/widgets/page_heading.dart';
+import 'package:deux_lapins_manager/ui/shared/admin_status_badges.dart';
+import 'package:deux_lapins_manager/domain/models/admin_home_content.dart';
+import 'package:deux_lapins_manager/ui/journal/journal_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -57,6 +57,17 @@ class JournalPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 20),
+          if (state.loading) const LinearProgressIndicator(minHeight: 2),
+          if (state.errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(state.errorMessage!, style: const TextStyle(color: Colors.red)),
+            ),
+          if (!state.loading && state.errorMessage == null && state.visible.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('조건에 맞는 저널이 없습니다.'),
+            ),
           Container(
             decoration: BoxDecoration(border: Border.all(color: AdminTheme.line)),
             child: Column(

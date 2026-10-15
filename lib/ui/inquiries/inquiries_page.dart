@@ -1,10 +1,10 @@
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/utils/formatters.dart';
-import 'package:duex_lapins_manager/core/widgets/page_heading.dart';
-import 'package:duex_lapins_manager/ui/shared/admin_status_badges.dart';
-import 'package:duex_lapins_manager/domain/models/admin_inquiry.dart';
-import 'package:duex_lapins_manager/ui/inquiries/inquiries_view_model.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/utils/formatters.dart';
+import 'package:deux_lapins_manager/core/widgets/page_heading.dart';
+import 'package:deux_lapins_manager/ui/shared/admin_status_badges.dart';
+import 'package:deux_lapins_manager/domain/models/admin_inquiry.dart';
+import 'package:deux_lapins_manager/ui/inquiries/inquiries_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -41,6 +41,11 @@ class InquiriesPage extends ConsumerWidget {
                   ),
                 ),
               ),
+              TextButton.icon(
+                onPressed: state.loading || state.saving ? null : vm.refresh,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('새로고침'),
+              ),
               _filter('전체', state.type == null, () => vm.selectType(null)),
               ...AdminInquiryType.values.map(
                 (type) => _filter(
@@ -60,12 +65,22 @@ class InquiriesPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 20),
+          if (state.loading) const LinearProgressIndicator(minHeight: 2),
+          if (state.errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                state.errorMessage!,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
           Container(
             decoration: BoxDecoration(border: Border.all(color: AdminTheme.line)),
             child: Column(
               children: state.visible.map((inquiry) {
                 return InkWell(
-                  onTap: () => _open(context, inquiry, vm),
+                  onTap: state.saving || state.loading
+                      ? null : () => _open(context, inquiry, vm),
                   child: Container(
                     padding: const EdgeInsets.all(18),
                     decoration: const BoxDecoration(
@@ -186,10 +201,16 @@ class InquiriesPage extends ConsumerWidget {
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: () {
-                        if (answer.text.trim().isEmpty) return;
-                        vm.answer(inquiry.id, answer.text.trim());
-                        Navigator.pop(dialogContext);
+                      onPressed: () async {
+                        try {
+                          await vm.answer(inquiry.id, answer.text.trim());
+                          if (dialogContext.mounted) Navigator.pop(dialogContext);
+                        } catch (error) {
+                          if (!dialogContext.mounted) return;
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(content: Text('답변 등록 실패: $error')),
+                          );
+                        }
                       },
                       child: const Text('답변 등록'),
                     ),

@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:duex_lapins_manager/app/app_routes.dart';
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/utils/formatters.dart';
-import 'package:duex_lapins_manager/domain/models/admin_product.dart';
-import 'package:duex_lapins_manager/ui/dashboard/dashboard_view_model.dart';
-import 'package:duex_lapins_manager/ui/inventory/inventory_view_model.dart';
-import 'package:duex_lapins_manager/ui/products/products_view_model.dart';
-import 'package:duex_lapins_manager/ui/shared/admin_status_badges.dart';
+import 'package:deux_lapins_manager/app/app_routes.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/utils/formatters.dart';
+import 'package:deux_lapins_manager/domain/models/admin_product.dart';
+import 'package:deux_lapins_manager/ui/dashboard/dashboard_view_model.dart';
+import 'package:deux_lapins_manager/ui/inventory/inventory_view_model.dart';
+import 'package:deux_lapins_manager/ui/products/products_view_model.dart';
+import 'package:deux_lapins_manager/ui/shared/admin_status_badges.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -53,6 +53,8 @@ class _ProductCreatePageState extends ConsumerState<ProductCreatePage> {
 
   AdminProductLine _line = AdminProductLine.classic;
   AdminProductStatus _status = AdminProductStatus.selling;
+  bool _isBest = false;
+  bool _isPremium = false;
   AdminProduct? _editingProduct;
   bool _saving = false;
 
@@ -92,6 +94,8 @@ class _ProductCreatePageState extends ConsumerState<ProductCreatePage> {
         _care.text = product.care;
         _line = product.line;
         _status = product.status;
+        _isBest = product.isBest;
+        _isPremium = product.isPremium;
         _sizes
           ..clear()
           ..addAll(product.sizes);
@@ -847,20 +851,40 @@ class _ProductCreatePageState extends ConsumerState<ProductCreatePage> {
     return _Section(
       index: '05',
       title: '게시 설정',
-      description: '상품의 판매 상태를 설정합니다.',
+      description: '상품의 판매 상태와 스토어 노출 구분을 설정합니다.',
       dense: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: AdminProductStatus.values.map((status) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _ChoiceButton(
-              label: status.label,
-              selected: _status == status,
-              onTap: () => setState(() => _status = status),
+        children: [
+          for (final status in AdminProductStatus.values)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _ChoiceButton(
+                label: status.label,
+                selected: _status == status,
+                onTap: () => setState(() => _status = status),
+              ),
             ),
-          );
-        }).toList(),
+          const Divider(height: 28),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('BEST 상품'),
+            subtitle: const Text('BEST 목록과 홈페이지 베스트셀러에 노출'),
+            value: _isBest,
+            onChanged: (value) {
+              setState(() => _isBest = value ?? false);
+            },
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('PREMIUM 상품'),
+            subtitle: const Text('PREMIUM 상품 목록에 노출'),
+            value: _isPremium,
+            onChanged: (value) {
+              setState(() => _isPremium = value ?? false);
+            },
+          ),
+        ],
       ),
     );
   }
@@ -1186,7 +1210,8 @@ class _ProductCreatePageState extends ConsumerState<ProductCreatePage> {
   ) async {
     FocusManager.instance.primaryFocus?.unfocus();
     if (!_formKey.currentState!.validate()) return;
-    if (_mainImageBytes == null) {
+    if (_mainImageBytes == null &&
+        (!widget.editing || _editingProduct?.mainImageBase64?.isNotEmpty == true)) {
       _message('대표 이미지를 등록해주세요.');
       return;
     }
@@ -1227,27 +1252,43 @@ class _ProductCreatePageState extends ConsumerState<ProductCreatePage> {
       publishStatus: publishStatus,
       updatedAt: now,
       inventory: inventory,
-      mainImageBase64: base64Encode(_mainImageBytes!),
+      isBest: _isBest,
+      isPremium: _isPremium,
+      mainImageBase64: _mainImageBytes == null
+          ? _editingProduct?.mainImageBase64
+          : base64Encode(_mainImageBytes!),
       detailImageBase64: _detailImages.map(base64Encode).toList(),
     );
 
-    ref.read(productsViewModelProvider.notifier).saveProduct(product);
-    ref.invalidate(inventoryViewModelProvider);
-    ref.invalidate(dashboardViewModelProvider);
-    if (!mounted) return;
-    setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          publishStatus == AdminPublishStatus.draft
-              ? '상품을 임시저장했습니다.'
-              : widget.editing
-                  ? '상품 수정사항을 게시했습니다.'
-                  : '새 상품을 게시했습니다.',
+    try {
+      await ref.read(productsViewModelProvider.notifier).saveProduct(product);
+
+      ref.invalidate(inventoryViewModelProvider);
+      ref.invalidate(dashboardViewModelProvider);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            publishStatus == AdminPublishStatus.draft
+                ? '상품을 임시저장했습니다.'
+                : widget.editing
+                ? '상품 수정사항을 게시했습니다.'
+                : '새 상품을 게시했습니다.',
+          ),
         ),
-      ),
-    );
-    context.go(AdminRoutePath.products);
+      );
+
+      context.go(AdminRoutePath.products);
+    } catch (error) {
+      if (!mounted) return;
+      _message('상품 저장 실패: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 
   void _showFullPreview() {

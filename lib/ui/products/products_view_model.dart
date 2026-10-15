@@ -1,5 +1,5 @@
-import 'package:duex_lapins_manager/core/di/providers.dart';
-import 'package:duex_lapins_manager/domain/models/admin_product.dart';
+import 'package:deux_lapins_manager/core/di/providers.dart';
+import 'package:deux_lapins_manager/domain/models/admin_product.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ProductsState {
@@ -11,6 +11,9 @@ class ProductsState {
     this.publish = '전체',
     this.page = 1,
     this.pageSize = 20,
+    this.loading = false,
+    this.saving = false,
+    this.errorMessage,
   });
 
   final List<AdminProduct> all;
@@ -20,6 +23,9 @@ class ProductsState {
   final String publish;
   final int page;
   final int pageSize;
+  final bool loading;
+  final bool saving;
+  final String? errorMessage;
 
   List<AdminProduct> get visible {
     final normalized = query.trim().toLowerCase();
@@ -72,6 +78,10 @@ class ProductsState {
     String? publish,
     int? page,
     int? pageSize,
+    bool? loading,
+    bool? saving,
+    String? errorMessage,
+    bool clearError = false,
   }) {
     return ProductsState(
       all: all ?? this.all,
@@ -81,6 +91,9 @@ class ProductsState {
       publish: publish ?? this.publish,
       page: page ?? this.page,
       pageSize: pageSize ?? this.pageSize,
+      loading: loading ?? this.loading,
+      saving: saving ?? this.saving,
+      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
 }
@@ -91,6 +104,7 @@ final productsViewModelProvider =
 class ProductsViewModel extends Notifier<ProductsState> {
   @override
   ProductsState build() {
+    Future<void>.microtask(refresh);
     return ProductsState(all: ref.read(adminRepositoryProvider).getProducts());
   }
 
@@ -143,17 +157,83 @@ class ProductsViewModel extends Notifier<ProductsState> {
     return ref.read(adminRepositoryProvider).getProduct(productId);
   }
 
-  void refresh() {
-    state = state.copyWith(all: ref.read(adminRepositoryProvider).getProducts());
+  Future<void> refresh() async {
+    state = state.copyWith(
+      loading: true,
+      clearError: true,
+    );
+
+    try {
+      final products =
+      await ref.read(adminRepositoryProvider).fetchProductsApi();
+
+      state = state.copyWith(
+        all: products,
+        loading: false,
+      );
+    } catch (error) {
+      state = state.copyWith(
+        loading: false,
+        errorMessage: '$error',
+      );
+    }
   }
 
-  void saveProduct(AdminProduct product) {
-    final repository = ref.read(adminRepositoryProvider);
-    if (repository.getProduct(product.id) == null) {
-      repository.addProduct(product);
-    } else {
-      repository.updateProduct(product);
+  Future<void> saveProduct(AdminProduct product) async {
+    if (state.saving) {
+      throw StateError('상품 저장 요청이 진행 중입니다.');
     }
-    state = state.copyWith(all: repository.getProducts());
+
+    state = state.copyWith(
+      saving: true,
+      clearError: true,
+    );
+
+    try {
+      await ref.read(adminRepositoryProvider).saveProductApi(product);
+
+      final products =
+      await ref.read(adminRepositoryProvider).fetchProductsApi();
+
+      state = state.copyWith(
+        all: products,
+        saving: false,
+      );
+    } catch (error) {
+      state = state.copyWith(
+        saving: false,
+        errorMessage: '$error',
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> deleteProduct(String productId) async {
+    if (state.saving) {
+      throw StateError('상품 요청이 진행 중입니다.');
+    }
+
+    state = state.copyWith(
+      saving: true,
+      clearError: true,
+    );
+
+    try {
+      await ref.read(adminRepositoryProvider).deleteProductApi(productId);
+
+      final products =
+      await ref.read(adminRepositoryProvider).fetchProductsApi();
+
+      state = state.copyWith(
+        all: products,
+        saving: false,
+      );
+    } catch (error) {
+      state = state.copyWith(
+        saving: false,
+        errorMessage: '$error',
+      );
+      rethrow;
+    }
   }
 }

@@ -1,11 +1,11 @@
-import 'package:duex_lapins_manager/app/app_routes.dart';
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/utils/formatters.dart';
-import 'package:duex_lapins_manager/core/widgets/page_heading.dart';
-import 'package:duex_lapins_manager/ui/shared/admin_status_badges.dart';
-import 'package:duex_lapins_manager/domain/models/admin_order.dart';
-import 'package:duex_lapins_manager/ui/orders/orders_view_model.dart';
+import 'package:deux_lapins_manager/app/app_routes.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/utils/formatters.dart';
+import 'package:deux_lapins_manager/core/widgets/page_heading.dart';
+import 'package:deux_lapins_manager/ui/shared/admin_status_badges.dart';
+import 'package:deux_lapins_manager/domain/models/admin_order.dart';
+import 'package:deux_lapins_manager/ui/orders/orders_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,6 +23,8 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
   late final TextEditingController _carrier;
   late final TextEditingController _tracking;
   late final TextEditingController _memo;
+  final Map<String, String> _itemCarriers = {};
+  final Map<String, String> _itemTracking = {};
   AdminOrderStatus? _status;
 
   @override
@@ -45,7 +47,7 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(ordersViewModelProvider);
+    final orderState = ref.watch(ordersViewModelProvider);
     final vm = ref.read(ordersViewModelProvider.notifier);
     final order = vm.getById(widget.orderId);
 
@@ -142,18 +144,37 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () {
-                        vm.updateOrder(
-                          order.copyWith(
+                      onPressed: orderState.saving || orderState.loading
+                          ? null
+                          : () async {
+                        try {
+                          await vm.updateOrder(order.copyWith(
                             status: _status ?? order.status,
                             carrier: _carrier.text.trim(),
                             trackingNumber: _tracking.text.trim(),
                             adminMemo: _memo.text.trim(),
-                          ),
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('주문 정보를 저장했습니다.')),
-                        );
+                            items: order.items.map((item) {
+                              final key = item.variantId.isEmpty
+                                  ? item.productId
+                                  : item.variantId;
+
+                              return item.copyWith(
+                                carrier: _itemCarriers[key] ?? item.carrier,
+                                trackingNumber:
+                                _itemTracking[key] ?? item.trackingNumber,
+                              );
+                            }).toList(growable: false),
+                          ));
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('주문 정보를 저장했습니다.')),
+                          );
+                        } catch (error) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('주문 저장 실패: $error')),
+                          );
+                        }
                       },
                       child: const Text('변경사항 저장'),
                     ),
@@ -217,6 +238,46 @@ class _OrderDetailPageState extends ConsumerState<OrderDetailPage> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        key: ValueKey(
+                          'carrier-${item.variantId}-${item.color}-${item.size}',
+                        ),
+                        initialValue: item.carrier,
+                        decoration: const InputDecoration(
+                          labelText: '이 상품의 택배사',
+                        ),
+                        onChanged: (value) {
+                          final key = item.variantId.isEmpty
+                              ? item.productId
+                              : item.variantId;
+                          _itemCarriers[key] = value;
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        key: ValueKey(
+                          'tracking-${item.variantId}-${item.color}-${item.size}',
+                        ),
+                        initialValue: item.trackingNumber,
+                        decoration: const InputDecoration(
+                          labelText: '이 상품의 운송장번호',
+                        ),
+                        onChanged: (value) {
+                          final key = item.variantId.isEmpty
+                              ? item.productId
+                              : item.variantId;
+                          _itemTracking[key] = value;
+                        },
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '배송상태: ${item.deliveryStatus}',
+                        style: AdminTypography.label(
+                          fontSize: 10,
+                          color: AdminTheme.muted,
+                        ),
                       ),
                     ],
                   ),

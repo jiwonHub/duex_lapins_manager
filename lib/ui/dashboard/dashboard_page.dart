@@ -1,13 +1,13 @@
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/utils/formatters.dart';
-import 'package:duex_lapins_manager/core/widgets/metric_card.dart';
-import 'package:duex_lapins_manager/core/widgets/page_heading.dart';
-import 'package:duex_lapins_manager/ui/shared/admin_status_badges.dart';
-import 'package:duex_lapins_manager/domain/models/admin_inquiry.dart';
-import 'package:duex_lapins_manager/domain/models/admin_order.dart';
-import 'package:duex_lapins_manager/domain/models/admin_product.dart';
-import 'package:duex_lapins_manager/ui/dashboard/dashboard_view_model.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/utils/formatters.dart';
+import 'package:deux_lapins_manager/core/widgets/metric_card.dart';
+import 'package:deux_lapins_manager/core/widgets/page_heading.dart';
+import 'package:deux_lapins_manager/ui/shared/admin_status_badges.dart';
+import 'package:deux_lapins_manager/domain/models/admin_inquiry.dart';
+import 'package:deux_lapins_manager/domain/models/admin_order.dart';
+import 'package:deux_lapins_manager/domain/models/admin_product.dart';
+import 'package:deux_lapins_manager/ui/dashboard/dashboard_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -68,7 +68,7 @@ class DashboardPage extends ConsumerWidget {
           index: '02.',
           label: '오늘 매출',
           value: formatWon(state.todaySales),
-          caption: '취소 주문 제외',
+          caption: '결제완료·미환불 주문',
           compact: true,
         ),
         MetricCard(

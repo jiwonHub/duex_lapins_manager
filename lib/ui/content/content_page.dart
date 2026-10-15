@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/widgets/page_heading.dart';
-import 'package:duex_lapins_manager/domain/models/admin_home_content.dart';
-import 'package:duex_lapins_manager/ui/content/home_content_view_model.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/widgets/page_heading.dart';
+import 'package:deux_lapins_manager/domain/models/admin_home_content.dart';
+import 'package:deux_lapins_manager/ui/content/home_content_view_model.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +25,7 @@ class _ContentPageState extends ConsumerState<ContentPage> {
   final _order = TextEditingController();
 
   bool _loaded = false;
+  bool _saving = false;
   bool _heroVisible = true;
   bool _classicVisible = true;
   bool _workVisible = true;
@@ -94,16 +95,24 @@ class _ContentPageState extends ConsumerState<ContentPage> {
                   child: const Text('미리보기'),
                 ),
                 OutlinedButton(
-                  onPressed: () => _save(AdminContentPublishStatus.draft),
+                  onPressed: _saving || state.loading || state.saving
+                      ? null : () => _save(AdminContentPublishStatus.draft),
                   child: const Text('임시저장'),
                 ),
                 FilledButton(
-                  onPressed: () => _save(AdminContentPublishStatus.published),
+                  onPressed: _saving || state.loading || state.saving
+                      ? null : () => _save(AdminContentPublishStatus.published),
                   child: const Text('게시'),
                 ),
               ],
             ),
           ),
+          if (state.loading || _saving) const LinearProgressIndicator(minHeight: 2),
+          if (state.errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(state.errorMessage!, style: const TextStyle(color: Colors.red)),
+            ),
           const SizedBox(height: 30),
           _section(
             '01.',
@@ -411,17 +420,31 @@ class _ContentPageState extends ConsumerState<ContentPage> {
     );
   }
 
-  void _save(AdminContentPublishStatus status) {
-    ref.read(homeContentViewModelProvider.notifier).save(_build(status));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          status == AdminContentPublishStatus.draft
-              ? '홈페이지 콘텐츠를 임시저장했습니다.'
-              : '홈페이지 콘텐츠를 게시했습니다.',
-        ),
-      ),
-    );
+  Future<void> _save(AdminContentPublishStatus status) async {
+    if (_saving) return;
+    final order = int.tryParse(_order.text.trim());
+    if (order == null || order < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('노출 순서는 0 이상의 정수로 입력해주세요.')),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ref.read(homeContentViewModelProvider.notifier).save(_build(status));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(status == AdminContentPublishStatus.draft
+            ? '홈페이지 콘텐츠를 임시저장했습니다.' : '홈페이지 콘텐츠를 게시했습니다.'),
+      ));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('홈페이지 콘텐츠 저장 실패: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   void _preview() {

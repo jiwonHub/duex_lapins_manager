@@ -1,12 +1,16 @@
-import 'package:duex_lapins_manager/domain/models/admin_claim.dart';
-import 'package:duex_lapins_manager/domain/models/admin_customer.dart';
-import 'package:duex_lapins_manager/domain/models/admin_home_content.dart';
-import 'package:duex_lapins_manager/domain/models/admin_inquiry.dart';
-import 'package:duex_lapins_manager/domain/models/admin_journal.dart';
-import 'package:duex_lapins_manager/domain/models/admin_order.dart';
-import 'package:duex_lapins_manager/domain/models/admin_product.dart';
-import 'package:duex_lapins_manager/domain/models/admin_store_settings.dart';
-import 'package:duex_lapins_manager/domain/repositories/admin_repository.dart';
+import 'package:deux_lapins_manager/core/network/shared_mock_api_client.dart';
+import 'package:deux_lapins_manager/data/services/admin_product_mock_api_data_source.dart';
+import 'package:deux_lapins_manager/data/services/admin_editorial_mock_api_data_source.dart';
+import 'package:deux_lapins_manager/data/services/admin_operations_mock_api_data_source.dart';
+import 'package:deux_lapins_manager/domain/models/admin_claim.dart';
+import 'package:deux_lapins_manager/domain/models/admin_customer.dart';
+import 'package:deux_lapins_manager/domain/models/admin_home_content.dart';
+import 'package:deux_lapins_manager/domain/models/admin_inquiry.dart';
+import 'package:deux_lapins_manager/domain/models/admin_journal.dart';
+import 'package:deux_lapins_manager/domain/models/admin_order.dart';
+import 'package:deux_lapins_manager/domain/models/admin_product.dart';
+import 'package:deux_lapins_manager/domain/models/admin_store_settings.dart';
+import 'package:deux_lapins_manager/domain/repositories/admin_repository.dart';
 
 class AdminMockRepository implements AdminRepository {
   final List<AdminProduct> _products = [
@@ -364,13 +368,151 @@ class AdminMockRepository implements AdminRepository {
     defaultGuide: '배송 및 교환/반품 관련 안내는 상품 상세와 고객센터에서 확인할 수 있습니다.',
   );
 
+  late final AdminProductApiDataSource _productApi =
+  AdminProductMockApiDataSource(_products);
+
+  AdminProductMockApiDataSource get _mockProductApi =>
+      _productApi as AdminProductMockApiDataSource;
+
+  Future<dynamic> _productRequest(
+      String method,
+      String path, [
+        Map<String, dynamic>? body,
+      ]) async {
+    final response = SharedMockApiClient.enabled
+        ? await SharedMockApiClient.instance.request(method, path, body)
+        : await _productApi.request(method, path, body);
+
+    if (response['success'] != true) {
+      final error = response['error'] as Map<String, dynamic>?;
+
+      throw AdminProductApiException(
+        error?['code']?.toString() ?? 'UNKNOWN',
+        error?['message']?.toString() ?? '상품 요청에 실패했습니다.',
+      );
+    }
+
+    return response['data'];
+  }
+
   @override
-  List<AdminProduct> getProducts() => List.unmodifiable(_products);
+  Future<List<AdminProduct>> fetchProductsApi() async {
+    final data =
+    await _productRequest('GET', '/products') as List<dynamic>;
+
+    final products = data.map((row) {
+      return AdminProductApiCodec.fromJson(
+        row as Map<String, dynamic>,
+      );
+    }).toList(growable: false);
+
+    if (SharedMockApiClient.enabled) {
+      _products
+        ..clear()
+        ..addAll(products);
+    }
+
+    return products;
+  }
+
+  @override
+  Future<AdminProduct?> fetchProductApi(String productId) async {
+    try {
+      final data = await _productRequest(
+        'GET',
+        '/products/${Uri.encodeComponent(productId)}',
+      );
+
+      return AdminProductApiCodec.fromJson(
+        data as Map<String, dynamic>,
+      );
+    } on AdminProductApiException catch (error) {
+      if (error.code == 'NOT_FOUND') return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<AdminProduct> saveProductApi(AdminProduct product) async {
+    final isNew = getProduct(product.id) == null;
+
+    final data = await _productRequest(
+      isNew ? 'POST' : 'PUT',
+      isNew
+          ? '/products'
+          : '/products/${Uri.encodeComponent(product.id)}',
+      AdminProductApiCodec.toJson(product),
+    );
+
+    final saved = AdminProductApiCodec.fromJson(
+      data as Map<String, dynamic>,
+    );
+
+    if (SharedMockApiClient.enabled) {
+      _products.removeWhere((item) => item.id == saved.id);
+      _products.insert(0, saved);
+    }
+
+    return saved;
+  }
+
+  @override
+  Future<AdminProduct> updateInventoryApi({
+    required String productId,
+    required String color,
+    required String size,
+    required int quantity,
+  }) async {
+    final data = await _productRequest(
+      'PATCH',
+      '/products/${Uri.encodeComponent(productId)}/inventory',
+      {
+        'color': color,
+        'size': size,
+        'quantity': quantity,
+      },
+    );
+
+    final updated = AdminProductApiCodec.fromJson(
+      data as Map<String, dynamic>,
+    );
+
+    if (SharedMockApiClient.enabled) {
+      final index = _products.indexWhere((item) => item.id == updated.id);
+      if (index >= 0) {
+        _products[index] = updated;
+      }
+    }
+
+    return updated;
+  }
+
+  @override
+  Future<void> deleteProductApi(String productId) async {
+    await _productRequest(
+      'DELETE',
+      '/products/${Uri.encodeComponent(productId)}',
+    );
+
+    if (SharedMockApiClient.enabled) {
+      _products.removeWhere((item) => item.id == productId);
+    }
+  }
+
+  @override
+  List<AdminProduct> getProducts() => List.unmodifiable(
+    _products.where(
+          (product) => !_mockProductApi.isDeleted(product.id),
+    ),
+  );
 
   @override
   AdminProduct? getProduct(String productId) {
     for (final product in _products) {
-      if (product.id == productId) return product;
+      if (product.id == productId &&
+          !_mockProductApi.isDeleted(productId)) {
+        return product;
+      }
     }
     return null;
   }
@@ -417,6 +559,145 @@ class AdminMockRepository implements AdminRepository {
       status: status,
       updatedAt: DateTime.now(),
     );
+  }
+
+  late final AdminOperationsMockApiDataSource _operationsApi =
+  AdminOperationsMockApiDataSource(_orders, _claims, _inquiries);
+
+  Future<dynamic> _operationsRequest(
+      String method,
+      String path, [
+        Map<String, dynamic>? body,
+      ]) async {
+    final response = SharedMockApiClient.enabled
+        ? await SharedMockApiClient.instance.request(method, path, body)
+        : await _operationsApi.request(method, path, body);
+    if (response['success'] != true) {
+      final error = response['error'] as Map<String, dynamic>?;
+      throw AdminOperationsApiException(
+        error?['code']?.toString() ?? 'UNKNOWN',
+        error?['message']?.toString() ?? '운영 API 요청에 실패했습니다.',
+      );
+    }
+    return response['data'];
+  }
+
+  @override
+  Future<List<AdminOrder>> fetchOrdersApi() async {
+    final data = await _operationsRequest('GET', '/admin/orders') as List<dynamic>;
+    final orders = data.map((row) => AdminOperationsApiCodec.orderFromJson(
+      row as Map<String, dynamic>,
+    )).toList(growable: false);
+
+    if (SharedMockApiClient.enabled) {
+      _orders
+        ..clear()
+        ..addAll(orders);
+    }
+
+    return orders;
+  }
+
+  @override
+  Future<AdminOrder?> fetchOrderApi(String orderId) async {
+    try {
+      final data = await _operationsRequest(
+        'GET', '/admin/orders/${Uri.encodeComponent(orderId)}',
+      );
+      return AdminOperationsApiCodec.orderFromJson(data as Map<String, dynamic>);
+    } on AdminOperationsApiException catch (error) {
+      if (error.code == 'NOT_FOUND') return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<AdminOrder> saveOrderApi(AdminOrder order) async {
+    final data = await _operationsRequest(
+      'PATCH', '/admin/orders/${Uri.encodeComponent(order.id)}',
+      {
+        'order_status': order.status.name,
+        'carrier': order.carrier,
+        'tracking_number': order.trackingNumber,
+        'items': order.items.map((item) => {
+          'product_variant_id':
+          item.variantId.isEmpty ? item.productId : item.variantId,
+          'carrier': item.carrier.trim().isEmpty ? null : item.carrier.trim(),
+          'tracking_number': item.trackingNumber.trim().isEmpty
+              ? null : item.trackingNumber.trim(),
+        }).toList(),
+        'admin_memo': order.adminMemo,
+      },
+    );
+    return AdminOperationsApiCodec.orderFromJson(data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> bulkShipOrdersApi({
+    required List<String> orderIds,
+    required String carrier,
+    required Map<String, String> trackingNumbers,
+  }) async {
+    await _operationsRequest('POST', '/admin/orders/bulk-shipping', {
+      'order_ids': orderIds,
+      'carrier': carrier,
+      'tracking_numbers': trackingNumbers,
+    });
+  }
+
+  @override
+  Future<List<AdminClaim>> fetchClaimsApi() async {
+    final data = await _operationsRequest('GET', '/admin/claims') as List<dynamic>;
+    final claims = data.map((row) => AdminOperationsApiCodec.claimFromJson(
+      row as Map<String, dynamic>,
+    )).toList(growable: false);
+
+    if (SharedMockApiClient.enabled) {
+      _claims
+        ..clear()
+        ..addAll(claims);
+    }
+
+    return claims;
+  }
+
+  @override
+  Future<AdminClaim> saveClaimApi(AdminClaim claim) async {
+    final data = await _operationsRequest(
+      'PATCH', '/admin/claims/${Uri.encodeComponent(claim.id)}',
+      {
+        'pickup_status': claim.pickupStatus.name,
+        'process_status': claim.processStatus.name,
+        'refund_status': claim.refundStatus.name,
+        'admin_memo': claim.adminMemo,
+      },
+    );
+    return AdminOperationsApiCodec.claimFromJson(data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<AdminInquiry>> fetchInquiriesApi() async {
+    final data = await _operationsRequest('GET', '/admin/inquiries') as List<dynamic>;
+    final inquiries = data.map((row) => AdminOperationsApiCodec.inquiryFromJson(
+      row as Map<String, dynamic>,
+    )).toList(growable: false);
+
+    if (SharedMockApiClient.enabled) {
+      _inquiries
+        ..clear()
+        ..addAll(inquiries);
+    }
+
+    return inquiries;
+  }
+
+  @override
+  Future<AdminInquiry> answerInquiryApi(String inquiryId, String answer) async {
+    final data = await _operationsRequest(
+      'PUT', '/admin/inquiries/${Uri.encodeComponent(inquiryId)}/answer',
+      {'answer': answer},
+    );
+    return AdminOperationsApiCodec.inquiryFromJson(data as Map<String, dynamic>);
   }
 
   @override
@@ -522,6 +803,134 @@ class AdminMockRepository implements AdminRepository {
       answer: answer,
       answeredAt: DateTime.now(),
     );
+  }
+
+  late final AdminEditorialMockApiDataSource _editorialApi =
+  AdminEditorialMockApiDataSource(
+    getHome: () => _homeContent,
+    setHome: (value) => _homeContent = value,
+    journals: _journals,
+    getSettings: () => _settings,
+    setSettings: (value) => _settings = value,
+    getProducts: getProducts,
+  );
+
+  Future<dynamic> _editorialRequest(String method, String path,
+      [Map<String, dynamic>? body]) async {
+    final response = SharedMockApiClient.enabled
+        ? await SharedMockApiClient.instance.request(method, path, body)
+        : await _editorialApi.request(method, path, body);
+    if (response['success'] != true) {
+      final error = response['error'] as Map<String, dynamic>?;
+      throw AdminEditorialApiException(
+        error?['code']?.toString() ?? 'UNKNOWN',
+        error?['message']?.toString() ?? '콘텐츠 요청에 실패했습니다.',
+      );
+    }
+    return response['data'];
+  }
+
+  @override
+  Future<AdminHomeContent> fetchHomeContentApi() async {
+    final data = await _editorialRequest('GET', '/admin/home-content');
+    final content = AdminEditorialCodec.homeFromJson(
+      data as Map<String, dynamic>,
+    );
+
+    if (SharedMockApiClient.enabled) {
+      _homeContent = content;
+    }
+
+    return content;
+  }
+
+  @override
+  Future<AdminHomeContent> saveHomeContentApi(AdminHomeContent content) async {
+    final data = await _editorialRequest(
+      'PUT',
+      '/admin/home-content',
+      AdminEditorialCodec.homeToJson(content),
+    );
+    final saved = AdminEditorialCodec.homeFromJson(
+      data as Map<String, dynamic>,
+    );
+
+    if (SharedMockApiClient.enabled) {
+      _homeContent = saved;
+    }
+
+    return saved;
+  }
+
+  @override
+  Future<List<AdminJournal>> fetchJournalsApi() async {
+    final rows = await _editorialRequest('GET', '/admin/journals') as List<dynamic>;
+    final journals = rows.map((row) => AdminEditorialCodec.journalFromJson(
+      row as Map<String, dynamic>,
+    )).toList(growable: false);
+
+    if (SharedMockApiClient.enabled) {
+      _journals
+        ..clear()
+        ..addAll(journals);
+    }
+
+    return journals;
+  }
+
+  @override
+  Future<AdminJournal?> fetchJournalApi(String journalId) async {
+    try {
+      final data = await _editorialRequest(
+          'GET', '/admin/journals/${Uri.encodeComponent(journalId)}');
+      return AdminEditorialCodec.journalFromJson(data as Map<String, dynamic>);
+    } on AdminEditorialApiException catch (error) {
+      if (error.code == 'NOT_FOUND') return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<AdminJournal> saveJournalApi(AdminJournal journal) async {
+    final isNew = getJournal(journal.id) == null;
+    final data = await _editorialRequest(
+      isNew ? 'POST' : 'PUT',
+      isNew ? '/admin/journals' : '/admin/journals/${Uri.encodeComponent(journal.id)}',
+      AdminEditorialCodec.journalToJson(journal),
+    );
+    return AdminEditorialCodec.journalFromJson(data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<AdminStoreSettings> fetchSettingsApi() async {
+    final data = await _editorialRequest('GET', '/admin/store-settings');
+    final settings = AdminEditorialCodec.settingsFromJson(
+      data as Map<String, dynamic>,
+    );
+
+    if (SharedMockApiClient.enabled) {
+      _settings = settings;
+    }
+
+    return settings;
+  }
+
+  @override
+  Future<AdminStoreSettings> saveSettingsApi(AdminStoreSettings settings) async {
+    final data = await _editorialRequest(
+      'PUT',
+      '/admin/store-settings',
+      AdminEditorialCodec.settingsToJson(settings),
+    );
+    final saved = AdminEditorialCodec.settingsFromJson(
+      data as Map<String, dynamic>,
+    );
+
+    if (SharedMockApiClient.enabled) {
+      _settings = saved;
+    }
+
+    return saved;
   }
 
   @override

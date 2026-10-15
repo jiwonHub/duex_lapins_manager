@@ -1,11 +1,11 @@
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/utils/formatters.dart';
-import 'package:duex_lapins_manager/core/widgets/admin_pagination.dart';
-import 'package:duex_lapins_manager/core/widgets/page_heading.dart';
-import 'package:duex_lapins_manager/ui/shared/admin_status_badges.dart';
-import 'package:duex_lapins_manager/domain/models/admin_claim.dart';
-import 'package:duex_lapins_manager/ui/claims/claims_view_model.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/utils/formatters.dart';
+import 'package:deux_lapins_manager/core/widgets/admin_pagination.dart';
+import 'package:deux_lapins_manager/core/widgets/page_heading.dart';
+import 'package:deux_lapins_manager/ui/shared/admin_status_badges.dart';
+import 'package:deux_lapins_manager/domain/models/admin_claim.dart';
+import 'package:deux_lapins_manager/ui/claims/claims_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -56,6 +56,15 @@ class ClaimsPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 20),
+          if (state.loading) const LinearProgressIndicator(minHeight: 2),
+          if (state.errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                state.errorMessage!,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
           Container(
             decoration: BoxDecoration(
               border: Border.all(color: AdminTheme.line),
@@ -118,7 +127,8 @@ class ClaimsPage extends ConsumerWidget {
                                 ),
                                 DataCell(
                                   TextButton(
-                                    onPressed: () => _edit(context, claim, vm),
+                                    onPressed: state.saving || state.loading
+                                        ? null : () => _edit(context, claim, vm),
                                     child: const Text('처리'),
                                   ),
                                 ),
@@ -262,16 +272,21 @@ class ClaimsPage extends ConsumerWidget {
                       ),
                       const SizedBox(width: 8),
                       FilledButton(
-                        onPressed: () {
-                          vm.updateClaim(
-                            claim.copyWith(
+                        onPressed: () async {
+                          try {
+                            await vm.updateClaim(claim.copyWith(
                               pickupStatus: pickup,
                               processStatus: process,
                               refundStatus: refund,
                               adminMemo: memo.text.trim(),
-                            ),
-                          );
-                          Navigator.pop(dialogContext);
+                            ));
+                            if (dialogContext.mounted) Navigator.pop(dialogContext);
+                          } catch (error) {
+                            if (!dialogContext.mounted) return;
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              SnackBar(content: Text('요청 처리 실패: $error')),
+                            );
+                          }
                         },
                         child: const Text('저장'),
                       ),

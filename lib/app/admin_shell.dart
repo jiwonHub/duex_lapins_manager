@@ -1,6 +1,6 @@
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/ui/shared/admin_header.dart';
-import 'package:duex_lapins_manager/ui/shared/admin_sidebar.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/ui/shared/admin_header.dart';
+import 'package:deux_lapins_manager/ui/shared/admin_sidebar.dart';
 import 'package:flutter/material.dart';
 
 class AdminShell extends StatefulWidget {

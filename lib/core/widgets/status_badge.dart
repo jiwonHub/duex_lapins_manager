@@ -1,4 +1,4 @@
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
 import 'package:flutter/material.dart';
 
 enum StatusBadgeTone {
@@ -39,36 +39,13 @@ class StatusBadge extends StatelessWidget {
 
     final colors = _colors(effectiveTone);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: colors.background,
-        border: Border.all(color: colors.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showDot) ...[
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: colors.foreground,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            text,
-            style: AdminTypography.label(
-              fontSize: 9.5,
-              letterSpacing: 0.7,
-              color: colors.foreground,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
+    return Text(
+      text,
+      style: AdminTypography.label(
+        fontSize: 9.5,
+        letterSpacing: 0.7,
+        color: colors.foreground,
+        fontWeight: FontWeight.w700,
       ),
     );
   }

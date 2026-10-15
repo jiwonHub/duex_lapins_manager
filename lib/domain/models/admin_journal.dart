@@ -1,4 +1,4 @@
-import 'package:duex_lapins_manager/domain/models/admin_home_content.dart';
+import 'package:deux_lapins_manager/domain/models/admin_home_content.dart';
 
 class AdminJournal {
   const AdminJournal({

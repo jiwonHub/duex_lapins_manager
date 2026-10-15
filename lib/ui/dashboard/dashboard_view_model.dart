@@ -1,8 +1,8 @@
-import 'package:duex_lapins_manager/core/di/providers.dart';
-import 'package:duex_lapins_manager/domain/models/admin_claim.dart';
-import 'package:duex_lapins_manager/domain/models/admin_inquiry.dart';
-import 'package:duex_lapins_manager/domain/models/admin_order.dart';
-import 'package:duex_lapins_manager/domain/models/admin_product.dart';
+import 'package:deux_lapins_manager/core/di/providers.dart';
+import 'package:deux_lapins_manager/domain/models/admin_claim.dart';
+import 'package:deux_lapins_manager/domain/models/admin_inquiry.dart';
+import 'package:deux_lapins_manager/domain/models/admin_order.dart';
+import 'package:deux_lapins_manager/domain/models/admin_product.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class DashboardState {
@@ -42,12 +42,16 @@ class DashboardViewModel extends Notifier<DashboardState> {
     final claims = repository.getClaims();
     final now = DateTime.now();
 
-    bool isToday(DateTime value) =>
-        value.year == now.year && value.month == now.month && value.day == now.day;
+    bool isToday(DateTime value) {
+      final local = value.toLocal();
+      return local.year == now.year && local.month == now.month && local.day == now.day;
+    }
 
     final todayOrders = orders.where((order) => isToday(order.orderedAt)).toList();
+    // 실제 정산액이 아닌 Mock 주문의 결제완료 총액. 부분환불은 금액 정보가 없어 제외.
     final todaySales = todayOrders
-        .where((order) => order.status != AdminOrderStatus.cancelled)
+        .where((order) => order.paymentStatus == AdminPaymentStatus.paid &&
+        order.status != AdminOrderStatus.cancelled)
         .fold<int>(0, (sum, order) => sum + order.amount);
     final lowStock = products
         .where((product) => product.inventory.any((item) => item.isLowStock))
@@ -60,7 +64,9 @@ class DashboardViewModel extends Notifier<DashboardState> {
           .where((order) => order.status == AdminOrderStatus.preparing)
           .length,
       claimRequestCount: claims
-          .where((claim) => claim.processStatus != AdminClaimProcessStatus.completed)
+          .where((claim) => claim.type != AdminClaimType.cancel &&
+          claim.processStatus != AdminClaimProcessStatus.completed &&
+          claim.processStatus != AdminClaimProcessStatus.rejected)
           .length,
       unansweredInquiryCount: inquiries
           .where((inquiry) => inquiry.status == AdminInquiryStatus.unanswered)

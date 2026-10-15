@@ -1,20 +1,69 @@
 import 'dart:convert';
 
-import 'package:duex_lapins_manager/app/app_routes.dart';
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/utils/formatters.dart';
-import 'package:duex_lapins_manager/core/widgets/admin_pagination.dart';
-import 'package:duex_lapins_manager/core/widgets/page_heading.dart';
-import 'package:duex_lapins_manager/ui/shared/admin_status_badges.dart';
-import 'package:duex_lapins_manager/domain/models/admin_product.dart';
-import 'package:duex_lapins_manager/ui/products/products_view_model.dart';
+import 'package:deux_lapins_manager/app/app_routes.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/utils/formatters.dart';
+import 'package:deux_lapins_manager/core/widgets/admin_pagination.dart';
+import 'package:deux_lapins_manager/core/widgets/page_heading.dart';
+import 'package:deux_lapins_manager/ui/shared/admin_status_badges.dart';
+import 'package:deux_lapins_manager/domain/models/admin_product.dart';
+import 'package:deux_lapins_manager/ui/inventory/inventory_view_model.dart';
+import 'package:deux_lapins_manager/ui/dashboard/dashboard_view_model.dart';
+import 'package:deux_lapins_manager/ui/products/products_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class ProductsPage extends ConsumerWidget {
   const ProductsPage({super.key});
+
+  Future<void> _confirmDelete(
+      BuildContext context,
+      WidgetRef ref,
+      AdminProduct product,
+      ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('상품 삭제'),
+        content: Text('「${product.name}」 상품을 목록에서 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ref
+          .read(productsViewModelProvider.notifier)
+          .deleteProduct(product.id);
+
+      ref.invalidate(inventoryViewModelProvider);
+      ref.invalidate(dashboardViewModelProvider);
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('상품을 삭제했습니다.')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('상품 삭제 실패: $error')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -70,6 +119,15 @@ class ProductsPage extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 20),
+          if (state.loading) const LinearProgressIndicator(minHeight: 2),
+          if (state.errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                state.errorMessage!,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
           Container(
             decoration: BoxDecoration(
               border: Border.all(color: AdminTheme.line),
@@ -154,10 +212,24 @@ class ProductsPage extends ConsumerWidget {
                       ),
                       DataCell(Text(formatDate(product.updatedAt))),
                       DataCell(
-                        TextButton(
-                          onPressed: () =>
-                              context.go(AdminRoutePath.productEdit(product.id)),
-                          child: const Text('수정'),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(
+                              onPressed: state.saving
+                                  ? null
+                                  : () => context.go(
+                                AdminRoutePath.productEdit(product.id),
+                              ),
+                              child: const Text('수정'),
+                            ),
+                            TextButton(
+                              onPressed: state.saving
+                                  ? null
+                                  : () => _confirmDelete(context, ref, product),
+                              child: const Text('삭제'),
+                            ),
+                          ],
                         ),
                       ),
                     ],

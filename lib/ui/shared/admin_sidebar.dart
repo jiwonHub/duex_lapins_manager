@@ -1,6 +1,6 @@
-import 'package:duex_lapins_manager/app/app_routes.dart';
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/app/app_routes.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -34,7 +34,7 @@ class AdminSidebar extends StatelessWidget {
                 height: 76,
                 width: 172,
                 child: Image.asset(
-                  'assets/images/duex_lapins_logo.png',
+                  'assets/images/deux_lapins_logo.png',
                   fit: BoxFit.contain,
                   alignment: Alignment.centerLeft,
                 ),

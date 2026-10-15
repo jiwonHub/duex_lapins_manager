@@ -1,7 +1,7 @@
-import 'package:duex_lapins_manager/core/di/providers.dart';
-import 'package:duex_lapins_manager/domain/models/admin_home_content.dart';
-import 'package:duex_lapins_manager/domain/models/admin_journal.dart';
-import 'package:duex_lapins_manager/domain/models/admin_product.dart';
+import 'package:deux_lapins_manager/core/di/providers.dart';
+import 'package:deux_lapins_manager/domain/models/admin_home_content.dart';
+import 'package:deux_lapins_manager/domain/models/admin_journal.dart';
+import 'package:deux_lapins_manager/domain/models/admin_product.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class JournalState {
@@ -11,8 +11,14 @@ class JournalState {
     this.query = '',
     this.category = 'ALL',
     this.publish = 'ALL',
+    this.loading = false,
+    this.saving = false,
+    this.errorMessage,
   });
 
+  final bool loading;
+  final bool saving;
+  final String? errorMessage;
   final List<AdminJournal> all;
   final List<AdminProduct> products;
   final String query;
@@ -37,6 +43,10 @@ class JournalState {
     String? query,
     String? category,
     String? publish,
+    bool? loading,
+    bool? saving,
+    String? errorMessage,
+    bool clearError = false,
   }) {
     return JournalState(
       all: all ?? this.all,
@@ -44,6 +54,9 @@ class JournalState {
       query: query ?? this.query,
       category: category ?? this.category,
       publish: publish ?? this.publish,
+      loading: loading ?? this.loading,
+      saving: saving ?? this.saving,
+      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
 }
@@ -55,6 +68,7 @@ class JournalViewModel extends Notifier<JournalState> {
   @override
   JournalState build() {
     final repository = ref.read(adminRepositoryProvider);
+    Future<void>.microtask(refresh);
     return JournalState(
       all: repository.getJournals(),
       products: repository.getProducts(),
@@ -69,9 +83,32 @@ class JournalViewModel extends Notifier<JournalState> {
     return ref.read(adminRepositoryProvider).getJournal(journalId);
   }
 
-  void save(AdminJournal journal) {
-    final repository = ref.read(adminRepositoryProvider);
-    repository.saveJournal(journal);
-    state = state.copyWith(all: repository.getJournals());
+  Future<void> save(AdminJournal journal) async {
+    if (state.saving || state.loading) {
+      throw StateError('저널 저장 요청이 진행 중입니다.');
+    }
+    state = state.copyWith(saving: true, clearError: true);
+    try {
+      final repository = ref.read(adminRepositoryProvider);
+      await repository.saveJournalApi(journal);
+      final journals = await repository.fetchJournalsApi();
+      state = state.copyWith(all: journals, saving: false);
+    } catch (error) {
+      state = state.copyWith(saving: false, errorMessage: '$error');
+      rethrow;
+    }
+  }
+
+  Future<void> refresh() async {
+    if (state.saving || state.loading) return;
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      final repository = ref.read(adminRepositoryProvider);
+      final journals = await repository.fetchJournalsApi();
+      final products = await repository.fetchProductsApi();
+      state = state.copyWith(all: journals, products: products, loading: false);
+    } catch (error) {
+      state = state.copyWith(loading: false, errorMessage: '$error');
+    }
   }
 }

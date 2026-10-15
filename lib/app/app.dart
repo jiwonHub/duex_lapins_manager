@@ -1,5 +1,5 @@
-import 'package:duex_lapins_manager/app/app_router.dart';
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/app/app_router.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
 import 'package:flutter/material.dart';
 
 class DuexLapinsAdminApp extends StatelessWidget {

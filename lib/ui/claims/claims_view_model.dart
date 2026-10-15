@@ -1,6 +1,6 @@
-import 'package:duex_lapins_manager/core/di/providers.dart';
-import 'package:duex_lapins_manager/domain/models/admin_claim.dart';
-import 'package:duex_lapins_manager/ui/dashboard/dashboard_view_model.dart';
+import 'package:deux_lapins_manager/core/di/providers.dart';
+import 'package:deux_lapins_manager/domain/models/admin_claim.dart';
+import 'package:deux_lapins_manager/ui/dashboard/dashboard_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ClaimsState {
@@ -10,8 +10,14 @@ class ClaimsState {
     this.status,
     this.page = 1,
     this.pageSize = 20,
+    this.loading = false,
+    this.saving = false,
+    this.errorMessage,
   });
 
+  final bool loading;
+  final bool saving;
+  final String? errorMessage;
   final List<AdminClaim> all;
   final AdminClaimType? type;
   final AdminClaimProcessStatus? status;
@@ -76,6 +82,10 @@ class ClaimsState {
     bool clearStatus = false,
     int? page,
     int? pageSize,
+    bool? loading,
+    bool? saving,
+    String? errorMessage,
+    bool clearError = false,
   }) {
     return ClaimsState(
       all: all ?? this.all,
@@ -83,6 +93,9 @@ class ClaimsState {
       status: clearStatus ? null : status ?? this.status,
       page: page ?? this.page,
       pageSize: pageSize ?? this.pageSize,
+      loading: loading ?? this.loading,
+      saving: saving ?? this.saving,
+      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
 }
@@ -93,6 +106,7 @@ final claimsViewModelProvider =
 class ClaimsViewModel extends Notifier<ClaimsState> {
   @override
   ClaimsState build() {
+    Future<void>.microtask(refresh);
     return ClaimsState(all: ref.read(adminRepositoryProvider).getClaims());
   }
 
@@ -137,10 +151,30 @@ class ClaimsViewModel extends Notifier<ClaimsState> {
     );
   }
 
-  void updateClaim(AdminClaim claim) {
-    final repository = ref.read(adminRepositoryProvider);
-    repository.updateClaim(claim);
-    state = state.copyWith(all: repository.getClaims());
-    ref.invalidate(dashboardViewModelProvider);
+  Future<void> updateClaim(AdminClaim claim) async {
+    if (state.saving || state.loading) {
+      throw StateError('다른 클레임 요청이 진행 중입니다.');
+    }
+    state = state.copyWith(saving: true, clearError: true);
+    try {
+      await ref.read(adminRepositoryProvider).saveClaimApi(claim);
+      final claims = await ref.read(adminRepositoryProvider).fetchClaimsApi();
+      state = state.copyWith(all: claims, saving: false);
+      ref.invalidate(dashboardViewModelProvider);
+    } catch (error) {
+      state = state.copyWith(saving: false, errorMessage: '$error');
+      rethrow;
+    }
+  }
+
+  Future<void> refresh() async {
+    if (state.saving || state.loading) return;
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      final claims = await ref.read(adminRepositoryProvider).fetchClaimsApi();
+      state = state.copyWith(all: claims, loading: false);
+    } catch (error) {
+      state = state.copyWith(loading: false, errorMessage: '$error');
+    }
   }
 }

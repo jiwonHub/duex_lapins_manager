@@ -44,6 +44,10 @@ class AdminOrderItem {
     required this.size,
     required this.quantity,
     required this.unitPrice,
+    this.variantId = '',
+    this.carrier = '',
+    this.trackingNumber = '',
+    this.deliveryStatus = 'preparing',
   });
 
   final String productId;
@@ -52,6 +56,28 @@ class AdminOrderItem {
   final String size;
   final int quantity;
   final int unitPrice;
+  final String variantId;
+  final String carrier;
+  final String trackingNumber;
+  final String deliveryStatus;
+
+  AdminOrderItem copyWith({
+    String? carrier,
+    String? trackingNumber,
+  }) {
+    return AdminOrderItem(
+      productId: productId,
+      productName: productName,
+      color: color,
+      size: size,
+      quantity: quantity,
+      unitPrice: unitPrice,
+      variantId: variantId,
+      carrier: carrier ?? this.carrier,
+      trackingNumber: trackingNumber ?? this.trackingNumber,
+      deliveryStatus: deliveryStatus,
+    );
+  }
 
   int get amount => unitPrice * quantity;
 }
@@ -98,6 +124,7 @@ class AdminOrder {
     String? carrier,
     String? trackingNumber,
     String? adminMemo,
+    List<AdminOrderItem>? items,
   }) {
     return AdminOrder(
       id: id,
@@ -105,7 +132,7 @@ class AdminOrder {
       customerName: customerName,
       phone: phone,
       address: address,
-      items: items,
+      items: items ?? this.items,
       shippingFee: shippingFee,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       status: status ?? this.status,

@@ -1,6 +1,6 @@
-import 'package:duex_lapins_manager/core/di/providers.dart';
-import 'package:duex_lapins_manager/domain/models/admin_inquiry.dart';
-import 'package:duex_lapins_manager/ui/dashboard/dashboard_view_model.dart';
+import 'package:deux_lapins_manager/core/di/providers.dart';
+import 'package:deux_lapins_manager/domain/models/admin_inquiry.dart';
+import 'package:deux_lapins_manager/ui/dashboard/dashboard_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class InquiriesState {
@@ -9,8 +9,14 @@ class InquiriesState {
     this.query = '',
     this.type,
     this.status,
+    this.loading = false,
+    this.saving = false,
+    this.errorMessage,
   });
 
+  final bool loading;
+  final bool saving;
+  final String? errorMessage;
   final List<AdminInquiry> all;
   final String query;
   final AdminInquiryType? type;
@@ -36,12 +42,19 @@ class InquiriesState {
     bool clearType = false,
     AdminInquiryStatus? status,
     bool clearStatus = false,
+    bool? loading,
+    bool? saving,
+    String? errorMessage,
+    bool clearError = false,
   }) {
     return InquiriesState(
       all: all ?? this.all,
       query: query ?? this.query,
       type: clearType ? null : type ?? this.type,
       status: clearStatus ? null : status ?? this.status,
+      loading: loading ?? this.loading,
+      saving: saving ?? this.saving,
+      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
 }
@@ -52,6 +65,7 @@ final inquiriesViewModelProvider =
 class InquiriesViewModel extends Notifier<InquiriesState> {
   @override
   InquiriesState build() {
+    Future<void>.microtask(refresh);
     return InquiriesState(all: ref.read(adminRepositoryProvider).getInquiries());
   }
 
@@ -63,10 +77,30 @@ class InquiriesViewModel extends Notifier<InquiriesState> {
       ? state.copyWith(clearStatus: true)
       : state.copyWith(status: status);
 
-  void answer(String inquiryId, String answer) {
-    final repository = ref.read(adminRepositoryProvider);
-    repository.answerInquiry(inquiryId, answer);
-    state = state.copyWith(all: repository.getInquiries());
-    ref.invalidate(dashboardViewModelProvider);
+  Future<void> answer(String inquiryId, String answer) async {
+    if (state.saving || state.loading) {
+      throw StateError('다른 문의 요청이 진행 중입니다.');
+    }
+    state = state.copyWith(saving: true, clearError: true);
+    try {
+      await ref.read(adminRepositoryProvider).answerInquiryApi(inquiryId, answer);
+      final inquiries = await ref.read(adminRepositoryProvider).fetchInquiriesApi();
+      state = state.copyWith(all: inquiries, saving: false);
+      ref.invalidate(dashboardViewModelProvider);
+    } catch (error) {
+      state = state.copyWith(saving: false, errorMessage: '$error');
+      rethrow;
+    }
+  }
+
+  Future<void> refresh() async {
+    if (state.saving || state.loading) return;
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      final inquiries = await ref.read(adminRepositoryProvider).fetchInquiriesApi();
+      state = state.copyWith(all: inquiries, loading: false);
+    } catch (error) {
+      state = state.copyWith(loading: false, errorMessage: '$error');
+    }
   }
 }

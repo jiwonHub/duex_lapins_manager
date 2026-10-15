@@ -1,7 +1,7 @@
-import 'package:duex_lapins_manager/core/di/providers.dart';
-import 'package:duex_lapins_manager/domain/models/admin_product.dart';
-import 'package:duex_lapins_manager/ui/dashboard/dashboard_view_model.dart';
-import 'package:duex_lapins_manager/ui/products/products_view_model.dart';
+import 'package:deux_lapins_manager/core/di/providers.dart';
+import 'package:deux_lapins_manager/domain/models/admin_product.dart';
+import 'package:deux_lapins_manager/ui/dashboard/dashboard_view_model.dart';
+import 'package:deux_lapins_manager/ui/products/products_view_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class InventoryRow {
@@ -26,7 +26,7 @@ class InventoryRow {
   final int lowStockThreshold;
 
   bool get isSoldOut => quantity <= 0;
-  bool get isLowStock => quantity <= lowStockThreshold;
+  bool get isLowStock => quantity > 0 && quantity <= lowStockThreshold;
 }
 
 class InventoryState {
@@ -36,6 +36,8 @@ class InventoryState {
     this.onlyLowStock = false,
     this.page = 1,
     this.pageSize = 20,
+    this.updating = false,
+    this.errorMessage,
   });
 
   final List<AdminProduct> products;
@@ -43,6 +45,8 @@ class InventoryState {
   final bool onlyLowStock;
   final int page;
   final int pageSize;
+  final bool updating;
+  final String? errorMessage;
 
   List<InventoryRow> get rows {
     final normalized = query.trim().toLowerCase();
@@ -109,6 +113,9 @@ class InventoryState {
     bool? onlyLowStock,
     int? page,
     int? pageSize,
+    bool? updating,
+    String? errorMessage,
+    bool clearError = false,
   }) {
     return InventoryState(
       products: products ?? this.products,
@@ -116,6 +123,8 @@ class InventoryState {
       onlyLowStock: onlyLowStock ?? this.onlyLowStock,
       page: page ?? this.page,
       pageSize: pageSize ?? this.pageSize,
+      updating: updating ?? this.updating,
+      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
 }
@@ -168,17 +177,44 @@ class InventoryViewModel extends Notifier<InventoryState> {
     );
   }
 
-  void updateQuantity(InventoryRow row, int quantity) {
-    final repository = ref.read(adminRepositoryProvider);
-    repository.updateInventory(
-      productId: row.productId,
-      color: row.color,
-      size: row.size,
-      quantity: quantity,
+  Future<void> updateQuantity(InventoryRow row, int quantity) async {
+    if (state.updating) {
+      throw StateError('재고 저장 요청이 진행 중입니다.');
+    }
+
+    if (quantity < 0) {
+      throw ArgumentError.value(quantity, 'quantity');
+    }
+
+    state = state.copyWith(
+      updating: true,
+      clearError: true,
     );
-    state = state.copyWith(products: repository.getProducts());
-    ref.invalidate(productsViewModelProvider);
-    ref.invalidate(dashboardViewModelProvider);
+
+    try {
+      final repository = ref.read(adminRepositoryProvider);
+
+      await repository.updateInventoryApi(
+        productId: row.productId,
+        color: row.color,
+        size: row.size,
+        quantity: quantity,
+      );
+
+      state = state.copyWith(
+        products: repository.getProducts(),
+        updating: false,
+      );
+
+      ref.invalidate(productsViewModelProvider);
+      ref.invalidate(dashboardViewModelProvider);
+    } catch (error) {
+      state = state.copyWith(
+        updating: false,
+        errorMessage: '$error',
+      );
+      rethrow;
+    }
   }
 }
 

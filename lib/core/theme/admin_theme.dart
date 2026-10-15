@@ -1,4 +1,4 @@
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
 import 'package:flutter/material.dart';
 
 abstract final class AdminTheme {

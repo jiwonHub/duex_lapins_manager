@@ -1,10 +1,10 @@
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/widgets/admin_pagination.dart';
-import 'package:duex_lapins_manager/core/widgets/page_heading.dart';
-import 'package:duex_lapins_manager/ui/shared/admin_status_badges.dart';
-import 'package:duex_lapins_manager/domain/models/admin_product.dart';
-import 'package:duex_lapins_manager/ui/inventory/inventory_view_model.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/widgets/admin_pagination.dart';
+import 'package:deux_lapins_manager/core/widgets/page_heading.dart';
+import 'package:deux_lapins_manager/ui/shared/admin_status_badges.dart';
+import 'package:deux_lapins_manager/domain/models/admin_product.dart';
+import 'package:deux_lapins_manager/ui/inventory/inventory_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -129,10 +129,29 @@ class InventoryPage extends ConsumerWidget {
                             inputFormatters: [
                               FilteringTextInputFormatter.digitsOnly,
                             ],
-                            onFieldSubmitted: (value) {
+                            enabled: !state.updating,
+                            onFieldSubmitted: (value) async {
                               final quantity = int.tryParse(value);
-                              if (quantity != null) {
-                                vm.updateQuantity(row, quantity);
+
+                              if (quantity == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('올바른 재고 수량을 입력해주세요.'),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              try {
+                                await vm.updateQuantity(row, quantity);
+                              } catch (error) {
+                                if (!context.mounted) return;
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('재고 저장 실패: $error'),
+                                  ),
+                                );
                               }
                             },
                           ),

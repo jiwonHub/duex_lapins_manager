@@ -1,8 +1,8 @@
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/widgets/page_heading.dart';
-import 'package:duex_lapins_manager/domain/models/admin_store_settings.dart';
-import 'package:duex_lapins_manager/ui/settings/settings_view_model.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/widgets/page_heading.dart';
+import 'package:deux_lapins_manager/domain/models/admin_store_settings.dart';
+import 'package:deux_lapins_manager/ui/settings/settings_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,9 +60,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(settingsViewModelProvider);
-    _load(settings);
-
+    final settingsState = ref.watch(settingsViewModelProvider);
+    _load(settingsState.settings);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(32, 34, 32, 70),
       child: Column(
@@ -73,10 +72,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: '기본 설정',
             description: '배송, 출고지, 교환/반품 주소와 고객센터 기본 정보를 관리합니다.',
             trailing: FilledButton(
-              onPressed: _save,
-              child: const Text('설정 저장'),
+              onPressed: settingsState.loading || settingsState.saving
+                  ? null : _save,
+              child: Text(settingsState.saving ? '저장 중...' : '설정 저장'),
             ),
           ),
+          if (settingsState.loading) const LinearProgressIndicator(minHeight: 2),
+          if (settingsState.errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(settingsState.errorMessage!,
+                  style: const TextStyle(color: Colors.red)),
+            ),
           const SizedBox(height: 34),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -183,10 +190,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  void _save() {
+  Future<void> _save() async {
+    final fee = int.tryParse(_shippingFee.text);
+    final threshold = int.tryParse(_freeShipping.text);
+    if (fee == null || threshold == null || fee < 0 || threshold < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('배송비와 무료배송 기준을 확인해주세요.')),
+      );
+      return;
+    }
     final settings = AdminStoreSettings(
-      shippingFee: int.tryParse(_shippingFee.text) ?? 0,
-      freeShippingThreshold: int.tryParse(_freeShipping.text) ?? 0,
+      shippingFee: fee,
+      freeShippingThreshold: threshold,
       carrier: _carrier.text.trim(),
       originAddress: _origin.text.trim(),
       returnAddress: _returnAddress.text.trim(),
@@ -195,9 +210,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       csHours: _csHours.text.trim(),
       defaultGuide: _guide.text.trim(),
     );
-    ref.read(settingsViewModelProvider.notifier).save(settings);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('기본 설정을 저장했습니다.')),
-    );
+    try {
+      await ref.read(settingsViewModelProvider.notifier).save(settings);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('기본 설정을 저장했습니다.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('기본 설정 저장 실패: $error')),
+      );
+    }
   }
 }

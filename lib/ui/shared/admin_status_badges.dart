@@ -1,10 +1,10 @@
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/core/widgets/status_badge.dart';
-import 'package:duex_lapins_manager/domain/models/admin_claim.dart';
-import 'package:duex_lapins_manager/domain/models/admin_home_content.dart';
-import 'package:duex_lapins_manager/domain/models/admin_inquiry.dart';
-import 'package:duex_lapins_manager/domain/models/admin_order.dart';
-import 'package:duex_lapins_manager/domain/models/admin_product.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/core/widgets/status_badge.dart';
+import 'package:deux_lapins_manager/domain/models/admin_claim.dart';
+import 'package:deux_lapins_manager/domain/models/admin_home_content.dart';
+import 'package:deux_lapins_manager/domain/models/admin_inquiry.dart';
+import 'package:deux_lapins_manager/domain/models/admin_order.dart';
+import 'package:deux_lapins_manager/domain/models/admin_product.dart';
 import 'package:flutter/material.dart';
 
 StatusBadge productSaleStatusBadge(AdminProductStatus status) {

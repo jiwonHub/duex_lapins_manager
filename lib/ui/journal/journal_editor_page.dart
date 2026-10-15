@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:duex_lapins_manager/app/app_routes.dart';
-import 'package:duex_lapins_manager/core/theme/admin_theme.dart';
-import 'package:duex_lapins_manager/core/theme/admin_typography.dart';
-import 'package:duex_lapins_manager/domain/models/admin_home_content.dart';
-import 'package:duex_lapins_manager/domain/models/admin_journal.dart';
-import 'package:duex_lapins_manager/ui/journal/journal_view_model.dart';
+import 'package:deux_lapins_manager/app/app_routes.dart';
+import 'package:deux_lapins_manager/core/theme/admin_theme.dart';
+import 'package:deux_lapins_manager/core/theme/admin_typography.dart';
+import 'package:deux_lapins_manager/domain/models/admin_home_content.dart';
+import 'package:deux_lapins_manager/domain/models/admin_journal.dart';
+import 'package:deux_lapins_manager/ui/journal/journal_view_model.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,6 +32,7 @@ class _JournalEditorPageState extends ConsumerState<JournalEditorPage> {
   final List<Uint8List> _additional = [];
   final Set<String> _relatedProductIds = {};
   AdminJournal? _editing;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -266,7 +267,8 @@ class _JournalEditorPageState extends ConsumerState<JournalEditorPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     FilledButton(
-                      onPressed: () => _save(AdminContentPublishStatus.published),
+                      onPressed: _saving || state.saving || state.loading
+                          ? null : () => _save(AdminContentPublishStatus.published),
                       child: const Text('게시'),
                     ),
                     const SizedBox(height: 8),
@@ -276,7 +278,8 @@ class _JournalEditorPageState extends ConsumerState<JournalEditorPage> {
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton(
-                      onPressed: () => _save(AdminContentPublishStatus.draft),
+                      onPressed: _saving || state.saving || state.loading
+                          ? null : () => _save(AdminContentPublishStatus.draft),
                       child: const Text('임시저장'),
                     ),
                   ],
@@ -367,13 +370,15 @@ class _JournalEditorPageState extends ConsumerState<JournalEditorPage> {
     return '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
   }
 
-  void _save(AdminContentPublishStatus status) {
+  Future<void> _save(AdminContentPublishStatus status) async {
+    if (_saving) return;
     if (_title.text.trim().isEmpty || _body.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('제목과 본문을 입력해주세요.')),
       );
       return;
     }
+    setState(() => _saving = true);
     final now = DateTime.now();
     final journal = AdminJournal(
       id: _editing?.id ?? 'J${now.microsecondsSinceEpoch}',
@@ -381,16 +386,25 @@ class _JournalEditorPageState extends ConsumerState<JournalEditorPage> {
       category: _category,
       body: _body.text.trim(),
       relatedProductIds: _relatedProductIds.toList(),
-      createdAt: _parseDate(_createdDate),
+      createdAt: _editing?.createdAt ?? _parseDate(_createdDate),
       publishAt: _parseDate(_publishDate),
       publishStatus: status,
       coverImageBase64: _cover == null ? null : base64Encode(_cover!),
       additionalImageBase64: _additional.map(base64Encode).toList(),
     );
-    ref.read(journalViewModelProvider.notifier).save(journal);
-    context.go(AdminRoutePath.journal);
+    try {
+      await ref.read(journalViewModelProvider.notifier).save(journal);
+      if (!mounted) return;
+      context.go(AdminRoutePath.journal);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('저널 저장 실패: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
-
   void _preview() {
     showDialog<void>(
       context: context,

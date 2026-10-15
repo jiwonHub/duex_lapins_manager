@@ -50,7 +50,7 @@ class AdminInventoryItem {
   final int lowStockThreshold;
 
   bool get isSoldOut => quantity <= 0;
-  bool get isLowStock => quantity <= lowStockThreshold;
+  bool get isLowStock => quantity > 0 && quantity <= lowStockThreshold;
 
   AdminInventoryItem copyWith({
     String? color,
@@ -86,6 +86,8 @@ class AdminProduct {
     required this.publishStatus,
     required this.updatedAt,
     required this.inventory,
+    this.isBest = false,
+    this.isPremium = false,
     this.mainImageBase64,
     this.detailImageBase64 = const [],
   });
@@ -107,6 +109,8 @@ class AdminProduct {
   final AdminPublishStatus publishStatus;
   final DateTime updatedAt;
   final List<AdminInventoryItem> inventory;
+  final bool isBest;
+  final bool isPremium;
   final String? mainImageBase64;
   final List<String> detailImageBase64;
 
@@ -137,6 +141,8 @@ class AdminProduct {
     AdminPublishStatus? publishStatus,
     DateTime? updatedAt,
     List<AdminInventoryItem>? inventory,
+    bool? isBest,
+    bool? isPremium,
     String? mainImageBase64,
     List<String>? detailImageBase64,
   }) {
@@ -158,6 +164,8 @@ class AdminProduct {
       publishStatus: publishStatus ?? this.publishStatus,
       updatedAt: updatedAt ?? this.updatedAt,
       inventory: inventory ?? this.inventory,
+      isBest: isBest ?? this.isBest,
+      isPremium: isPremium ?? this.isPremium,
       mainImageBase64: mainImageBase64 ?? this.mainImageBase64,
       detailImageBase64: detailImageBase64 ?? this.detailImageBase64,
     );

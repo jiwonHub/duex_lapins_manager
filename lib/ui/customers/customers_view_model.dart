@@ -1,6 +1,6 @@
-import 'package:duex_lapins_manager/core/di/providers.dart';
-import 'package:duex_lapins_manager/domain/models/admin_customer.dart';
-import 'package:duex_lapins_manager/domain/models/admin_order.dart';
+import 'package:deux_lapins_manager/core/di/providers.dart';
+import 'package:deux_lapins_manager/domain/models/admin_customer.dart';
+import 'package:deux_lapins_manager/domain/models/admin_order.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class CustomersState {
